@@ -20,8 +20,7 @@ void loop() {
       digitalWrite(led, LOW);
       state = false;
     }
-    while(button){
-      button = digitalRead(ron);
+    while(digitalRead(ron)){
       delay(10);
     }
   }
