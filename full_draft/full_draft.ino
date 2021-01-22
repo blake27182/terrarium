@@ -3,7 +3,6 @@
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_AHTX0.h>
 
-Adafruit_AHTX0 aht;
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -15,104 +14,132 @@ Adafruit_AHTX0 aht;
 #define HUMID 8
 #define HEAT 5
 
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-
-
-// declare running vars
-int looper, carousel;
-bool lastA, lastB, lastBut, currA, currB;
-float tempL, tempH, humidL, humidH, humidTolerance, tempTolerance;
+// declare running vars ////////////////
+Adafruit_AHTX0 aht;
 sensors_event_t humidity, temp;
+byte carousel;
+float tempL = 10;
+float tempH = 30;
+float humidL = 5;
+float humidH = 50;
 uint8_t cursor = 0;
 int8_t table[] = {0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0};
-bool heatState, humidState;
-unsigned long lastInteract;
+bool heatState = false; 
+bool humidState = false;
+bool fanAState = false;
+bool fanBState = false;
+unsigned long fanADelay = 0;
+unsigned long lastInteract = millis();
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 void setup() {
   Serial.begin(9600);
 
-  // setup rotary encoder
+  // rotary encoder ////////////////
   pinMode(ROT_A, INPUT);
   pinMode(ROT_B, INPUT);
   pinMode(ROT_C, INPUT);
+  // nichrome wire
   pinMode(HEAT, OUTPUT);
+  // ultrasonic transducer
   pinMode(HUMID, OUTPUT);
+  // dc fans
   pinMode(FAN_A, OUTPUT);
   pinMode(FAN_B, OUTPUT);
-
+  // add pulldown resistor to ground the base of this transistor
   digitalWrite(HEAT, LOW);
-  
-  lastInteract = millis();
-  carousel = 0;
 
-  // setup oled display
+  // setup oled display ////////////////
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
   }
   display.display();
   display.clearDisplay();
-
-  display.setTextSize(4);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 0);
-  // Display static text
-  display.println("hey?");
   display.display(); 
   
-  // setup temp sensor
+  // setup temp/humidity sensor ////////////////
   if (! aht.begin()) {
     Serial.println("Could not find AHT? Check wiring");
     while (1) delay(10);
   }
   aht.getEvent(&humidity, &temp);
-  tempL = 10;
-  tempH = 30;
-  humidL = 5;
-  humidH = 50;
-  heatState = false;
-  humidState = false;
 }
 
-void heatSwitch(bool power){
-  digitalWrite(HEAT, power);
-  digitalWrite(FAN_A, power|humidState);
-  heatState = power;
+// hardware control center ////////////////
+void heatPower(bool power){
+  if (power != heatState){
+    digitalWrite(HEAT, power);
+    heatState = power;
+    if (!power && !humidState){
+      fanADelay = millis();
+    } else {
+      fanADelay = 0;
+    }
+  }
 }
 
-void humidSwitch(bool power){
+void humidPower(bool power){
   if (humidState != power){
-    digitalWrite(FAN_A, power|heatState);
+    digitalWrite(FAN_A, power);
 //    digitalWrite(HUMID, HIGH);
 //    delay(10);
 //    digitalWrite(HUMID, LOW);
     humidState = power;
+    if (!power && !heatState){
+      fanADelay = millis();
+    } else {
+      fanADelay = 0;
+    }
   }
 }
 
+void fanAPower(bool power){
+  if (power != fanAState){
+    digitalWrite(FAN_A, power);
+    fanAState = power;
+  }
+}
+
+void fanBPower(bool power){
+  if (power != fanBState){
+    digitalWrite(FAN_B, power);
+    fanBState = power;
+  }
+}
+
+bool rotaryRead(float &counter, float increment){
+  cursor <<= 2;
+  if (digitalRead(ROT_A)) {cursor |= 0b10;}
+  if (digitalRead(ROT_B)) {cursor |= 0b01;}
+  cursor &= 0x0f;
+  counter += table[cursor] * increment * .25;
+  if(table[cursor] == 0){
+    return false;
+  }
+  return true;
+}
+
 void homeScreen(){
-  
   aht.getEvent(&humidity, &temp);
 
-  if (!heatState){
-    if (temp.temperature < tempL){
-      heatSwitch(true);
-    }
-  } else {
-    if (temp.temperature >= tempH){
-      heatSwitch(false);
-    }
+  // in or out of bounds center ///////////////
+  if (temp.temperature < tempL){
+    heatPower(true);
+  } else if (temp.temperature >= tempH){
+    heatPower(false);
   }
 
-  if (!humidState){
-    if (humidity.relative_humidity < humidL){
-      humidSwitch(true);
-    }
-  } else {
-    if (humidity.relative_humidity >= humidH){
-      humidSwitch(false);
-    }
+  if (humidity.relative_humidity < humidL){
+    humidPower(true);
+  } else if (humidity.relative_humidity >= humidH){
+    humidPower(false);
+  }
+
+  // policy fulfillment center ////////////////
+  if (fanADelay && millis() - fanADelay > 30000){
+    fanAPower(false);
   }
     
   display.clearDisplay();
@@ -132,8 +159,8 @@ void tempLowScreen(){
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
 
-  if (tempL >= tempH - tempTolerance){
-    tempL = tempH - tempTolerance;
+  if (tempL > tempH){
+    tempL = tempH;
   }
 
   float temp = ((int)(tempL*10)-(int)(tempL*10)%5)/10.0;
@@ -147,8 +174,8 @@ void tempHighScreen(){
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
 
-  if (tempH <= tempL + tempTolerance){
-    tempH = tempL + tempTolerance;
+  if (tempH < tempL){
+    tempH = tempL;
   }
   
   float temp = ((int)(tempH*10)-(int)(tempH*10)%5)/10.0;
@@ -165,8 +192,8 @@ void humidLowScreen(){
   if (humidL < 0){
     humidL = 0;
   }
-  if (humidL >= humidH - humidTolerance){
-    humidL = humidH - humidTolerance;
+  if (humidL > humidH){
+    humidL = humidH;
   }
   display.print((int)humidL);
   display.println("%");
@@ -181,27 +208,15 @@ void humidHighScreen(){
   if (humidH > 100){
     humidH = 100;
   }
-  if (humidH <= humidL + humidTolerance){
-    humidH = humidL + humidTolerance;
+  if (humidH < humidL){
+    humidH = humidL;
   }
   display.print((int)humidH);
   display.println("%");
 }
 
-bool rotaryRead(float &counter, float increment){
-  cursor <<= 2;
-  if (digitalRead(ROT_A)) cursor |= 0x2;
-  if (digitalRead(ROT_B)) cursor |= 0x1;
-  cursor &= 0x0f;
-  counter += table[cursor] * increment * .25;
-  if(table[cursor] == 0){
-    return false;
-  }
-  return true;
-}
-
 void loop() {
-  
+  // page switch statement ////////////////
   switch (carousel){
     case 0:
       if (millis() - lastInteract > 500){
@@ -250,7 +265,7 @@ void loop() {
   }
 
   
-
+  // button check ////////////////
   if (!digitalRead(ROT_C)){
     carousel = (carousel + 1) % 5;
     lastInteract = millis();

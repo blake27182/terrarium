@@ -165,9 +165,9 @@ void loop() {
   Serial.println(F("starting unit tests"));
   
   if (displayTest()){
-//    rotaryTest();
-//    sensorTest();
-//    fanTest();
+    rotaryTest();
+    sensorTest();
+    fanTest();
   //  humidifierTest();
     heatTest();
     oneLiner(4, "done!");
