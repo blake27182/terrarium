@@ -9,8 +9,8 @@
 #define ROT_A  4
 #define ROT_B  3
 #define ROT_C  2
-#define FAN_A 6
-#define FAN_B 7
+#define FAN_A 7
+#define FAN_B 6
 #define HUMID 8
 #define HEAT 5
 
@@ -62,13 +62,11 @@ void sensorTest(){
   while (millis() < start + 10000){
     aht.getEvent(&h, &t);
     display.clearDisplay();
-    display.setTextSize(2);
+    display.setTextSize(4);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0,0);
-    display.print(F("t: "));
-    display.println(t.temperature);
-    display.print(F("h: "));
-    display.println(h.relative_humidity);
+    display.println(String(t.temperature, 1));
+    display.println((int)h.relative_humidity);
     display.display();
     delay(100);
   }
@@ -91,8 +89,12 @@ void rotaryTest(){
     if (digitalRead(ROT_B)) cursor |= 0x1;
     cursor &= 0x0f;
     counter += table[cursor];
-    
-    oneLiner(4, String(counter));
+
+    if (!digitalRead(ROT_C)){
+      oneLiner(3, F("button"));
+    } else {
+      oneLiner(4, String(counter));
+    }
   }
   oneLiner(2, F("rotary test complete"));
   delay(2000);
@@ -128,7 +130,7 @@ void heatTest(){
   oneLiner(2, F("heat test starting"));
   delay(2000);
   digitalWrite(HEAT, HIGH);
-  delay(5000);
+  delay(10000);
   digitalWrite(HEAT, LOW);
   oneLiner(2, F("heat test complete"));
   delay(2000);
@@ -163,11 +165,11 @@ void loop() {
   Serial.println(F("starting unit tests"));
   
   if (displayTest()){
-    rotaryTest();
-    sensorTest();
-  //  fanTest();
+//    rotaryTest();
+//    sensorTest();
+//    fanTest();
   //  humidifierTest();
-  //  heatTest();
+    heatTest();
     oneLiner(4, "done!");
   }
   
