@@ -1,4 +1,4 @@
-#define LED 7
+#define LED 5
 
 void setup() {
   // put your setup code here, to run once:
@@ -8,7 +8,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   digitalWrite(LED, HIGH);
-  delay(1000);
+  delay(5000);
   digitalWrite(LED, LOW);
-  delay(1000);
+  delay(5000);
 }

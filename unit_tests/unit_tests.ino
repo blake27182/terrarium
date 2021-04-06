@@ -6,13 +6,16 @@
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
-#define ROT_A  4
+#define ROT_A  2
 #define ROT_B  3
-#define ROT_C  2
-#define FAN_A 7
-#define FAN_B 6
-#define HUMID 8
-#define HEAT 5
+#define ROT_C  9
+#define FAN_A 12
+#define FAN_B 8
+#define HUMID 10
+#define HEAT 4
+#define _ON LOW
+#define _OFF HIGH
+
 
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
@@ -21,6 +24,10 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Adafruit_AHTX0 aht;
 const char tComplete[] PROGMEM = " test complete";
 const char tStarting[] PROGMEM = " test starting";
+int counter = 0;
+uint8_t bitCursor = 0;
+int8_t table[] = {0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0};
+
 
 
 void setup() {
@@ -33,20 +40,26 @@ void setup() {
   pinMode(ROT_C, INPUT);
   pinMode(HUMID, OUTPUT);
   pinMode(HEAT, OUTPUT);
+
+  digitalWrite(HEAT, _OFF);
+  digitalWrite(FAN_A, _OFF);
+  digitalWrite(FAN_B, _OFF);
+  digitalWrite(HUMID, _OFF);
 }
 
 void fanTest(){
   oneLiner(2, F("fan test starting"));
   delay(2000);
   oneLiner(4, F("fan A"));
-  digitalWrite(FAN_A, HIGH);
+  digitalWrite(FAN_A, _ON);
   delay(10000);
-  digitalWrite(FAN_A, LOW);
+  digitalWrite(FAN_A, _OFF);
+  
   oneLiner(4, F("fan B"));
   delay(2000);
-  digitalWrite(FAN_B, HIGH);
+  digitalWrite(FAN_B, _ON);
   delay(10000);
-  digitalWrite(FAN_B, LOW);
+  digitalWrite(FAN_B, _OFF);
   oneLiner(2, F("fan test complete"));
   delay(2000);
 }
@@ -74,28 +87,37 @@ void sensorTest(){
   delay(2000);
 }
 
+bool rotaryRead(){
+  delay(2);
+  bitCursor <<= 2;
+  if (digitalRead(ROT_A)) {bitCursor |= 0b10;}
+  if (digitalRead(ROT_B)) {bitCursor |= 0b01;}
+  bitCursor &= 0x0f;
+  counter += table[bitCursor];
+  if(table[bitCursor] != 0){
+    Serial.println(counter);
+    return true;
+  }
+  return false;
+}
+
 void rotaryTest(){
   oneLiner(2, F("rotary test starting"));
   delay(2000);
-
-  uint8_t cursor = 0;
-  int counter = 0;
-  int8_t table[] = {0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0};
   
-  unsigned long start = millis();
-  while (millis() < start + 10000){
-    cursor <<= 2;
-    if (digitalRead(ROT_A)) cursor |= 0x2;
-    if (digitalRead(ROT_B)) cursor |= 0x1;
-    cursor &= 0x0f;
-    counter += table[cursor];
+  attachInterrupt(digitalPinToInterrupt(ROT_A), rotaryRead, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ROT_B), rotaryRead, CHANGE);
 
-    if (!digitalRead(ROT_C)){
-      oneLiner(3, F("button"));
-    } else {
-      oneLiner(4, String(counter));
+  unsigned long testPeriod = millis() + 10000;
+  while (millis() < testPeriod){
+    if (! digitalRead(ROT_C)){
+      Serial.println("button");
     }
   }
+
+  detachInterrupt(digitalPinToInterrupt(ROT_A));
+  detachInterrupt(digitalPinToInterrupt(ROT_B));
+
   oneLiner(2, F("rotary test complete"));
   delay(2000);
 }
@@ -112,13 +134,12 @@ bool displayTest(){
   }
 
   display.clearDisplay();
-  display.setTextSize(4);             // Normal 1:1 pixel scale
-  display.setTextColor(SSD1306_WHITE);        // Draw white text
-  display.setCursor(0,0);             // Start at top-left corner
-  display.println(F("fuck!"));
-  display.println(F("fuck!"));
-
-  display.display();
+  for(int16_t i=0; i<max(display.width(),display.height())/2; i+=2) {
+    display.drawCircle(display.width()/2, display.height()/2, i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
+  
   delay(2000);
   
   oneLiner(2, F("display test complete"));
@@ -129,9 +150,9 @@ bool displayTest(){
 void heatTest(){
   oneLiner(2, F("heat test starting"));
   delay(2000);
-  digitalWrite(HEAT, HIGH);
+  digitalWrite(HEAT, _ON);
   delay(10000);
-  digitalWrite(HEAT, LOW);
+  digitalWrite(HEAT, _OFF);
   oneLiner(2, F("heat test complete"));
   delay(2000);
 }
@@ -165,11 +186,11 @@ void loop() {
   Serial.println(F("starting unit tests"));
   
   if (displayTest()){
-    rotaryTest();
-    sensorTest();
-    fanTest();
-  //  humidifierTest();
-    heatTest();
+//    rotaryTest(); 
+//    sensorTest();
+     fanTest();
+    // humidifierTest();
+    // heatTest();
     oneLiner(4, "done!");
   }
   

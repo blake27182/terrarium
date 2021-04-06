@@ -8,6 +8,7 @@ void setup() {
   // put your setup code here, to run once:
   pinMode(ron, INPUT);
   pinMode(led, OUTPUT);
+  Serial.begin(9600);
 }
 
 void loop() {
@@ -24,6 +25,8 @@ void loop() {
       delay(10);
     }
   }
+
+  Serial.println("helo");
     
   delay(10);
 }

@@ -1,8 +1,8 @@
 
 
 #define button 10
-#define outA 11
-#define outB 12
+#define outA 3
+#define outB 2
 
 void setup() {
   // put your setup code here, to run once:
@@ -28,12 +28,12 @@ void loop() {
       currPos--;
     }
   }
-
-  if (digitalRead(button)){
-    currPos = 0;
-    lastState = currState = 0;
-  }
+//
+//  if (!digitalRead(button)){
+//    currPos = 0;
+//    lastState = currState = 0;
+//  }
 
   Serial.println(currPos);
-  delay(5);
+  delay(50);
 }
