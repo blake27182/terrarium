@@ -303,6 +303,15 @@ void humidHighScreen(){
   display.println("%");
 }
 
+void pauseScreen(){
+  display.clearDisplay();
+  display.setTextSize(4);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 32);
+
+  display.println("Paused");
+}
+
 void loop() {
   // page switch statement ////////////////
   switch (carousel){
@@ -353,6 +362,9 @@ void loop() {
         carousel = 0;
       }
       break;
+    // case -1:
+    //   pauseScreen();
+    //   break;
   }
 
   // button check ////////////////
@@ -362,28 +374,33 @@ void loop() {
     clearBuffer();
     
     while (!digitalRead(ROT_C)){
+      // if (millis() > lastInteract + 3000){
+      //   carousel = -1;
+      // }
       delay(10);
     }
+
+    // page initialization
     switch (carousel){
-    case 0:
-      homeScreen();
-      break;
-    case 2:
-      counter = tempL/TEMP_FACTOR;
-      tempLowScreen();
-      break;
-    case 1:
-      counter = tempH/TEMP_FACTOR;
-      tempHighScreen();
-      break;
-    case 4:
-      counter = humidL/HUMID_FACTOR;
-      humidLowScreen();
-      break;
-    case 3:
-      counter = humidH/HUMID_FACTOR;
-      humidHighScreen();
-      break;
+      case 0:
+        homeScreen();
+        break;
+      case 2:
+        counter = tempL/TEMP_FACTOR;
+        tempLowScreen();
+        break;
+      case 1:
+        counter = tempH/TEMP_FACTOR;
+        tempHighScreen();
+        break;
+      case 4:
+        counter = humidL/HUMID_FACTOR;
+        humidLowScreen();
+        break;
+      case 3:
+        counter = humidH/HUMID_FACTOR;
+        humidHighScreen();
+        break;
     }
     display.display();
   }
