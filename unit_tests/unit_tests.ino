@@ -8,13 +8,11 @@
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define ROT_A  2
 #define ROT_B  3
-#define ROT_C  9
-#define FAN_A 12
-#define FAN_B 8
-#define HUMID 10
-#define HEAT 4
-#define _ON LOW
-#define _OFF HIGH
+#define ROT_C  5
+#define FAN_A 8
+#define FAN_B 10
+#define HUMID_P 12
+#define HEAT 6
 
 
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
@@ -33,33 +31,33 @@ int8_t table[] = {0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0};
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  pinMode(FAN_A, OUTPUT);
-  pinMode(FAN_B, OUTPUT);
   pinMode(ROT_A, INPUT);
   pinMode(ROT_B, INPUT);
   pinMode(ROT_C, INPUT);
-  pinMode(HUMID, OUTPUT);
+  pinMode(FAN_A, OUTPUT);
+  pinMode(FAN_B, OUTPUT);
+  pinMode(HUMID_P, OUTPUT);
   pinMode(HEAT, OUTPUT);
 
-  digitalWrite(HEAT, _OFF);
-  digitalWrite(FAN_A, _OFF);
-  digitalWrite(FAN_B, _OFF);
-  digitalWrite(HUMID, _OFF);
+  digitalWrite(HEAT, LOW);
+  digitalWrite(FAN_A, LOW);
+  digitalWrite(FAN_B, LOW);
+  digitalWrite(HUMID_P, LOW);
 }
 
 void fanTest(){
   oneLiner(2, F("fan test starting"));
   delay(2000);
   oneLiner(4, F("fan A"));
-  digitalWrite(FAN_A, _ON);
+  digitalWrite(FAN_A, HIGH);
   delay(10000);
-  digitalWrite(FAN_A, _OFF);
+  digitalWrite(FAN_A, LOW);
   
   oneLiner(4, F("fan B"));
   delay(2000);
-  digitalWrite(FAN_B, _ON);
+  digitalWrite(FAN_B, HIGH);
   delay(10000);
-  digitalWrite(FAN_B, _OFF);
+  digitalWrite(FAN_B, LOW);
   oneLiner(2, F("fan test complete"));
   delay(2000);
 }
@@ -68,7 +66,7 @@ void sensorTest(){
   oneLiner(2, F("sensor test starting"));
   delay(2000);
   if (! aht.begin()) {
-    Serial.println(F("Could not find AHT? Check wiring"));
+    oneLiner(2, F("Could not find AHT? Check wiring"));
   }
   unsigned long start = millis();
   sensors_event_t h, t;
@@ -109,10 +107,14 @@ void rotaryTest(){
   attachInterrupt(digitalPinToInterrupt(ROT_B), rotaryRead, CHANGE);
 
   unsigned long testPeriod = millis() + 10000;
+  int b_counter = 0;
   while (millis() < testPeriod){
-    if (! digitalRead(ROT_C)){
-      Serial.println("button");
+    if (!digitalRead(ROT_C)){
+      oneLiner(3, F("button"));
+    } else {
+      oneLiner(4, String(counter));
     }
+    
   }
 
   detachInterrupt(digitalPinToInterrupt(ROT_A));
@@ -150,23 +152,18 @@ bool displayTest(){
 void heatTest(){
   oneLiner(2, F("heat test starting"));
   delay(2000);
-  digitalWrite(HEAT, _ON);
+  digitalWrite(HEAT, HIGH);
   delay(10000);
-  digitalWrite(HEAT, _OFF);
+  digitalWrite(HEAT, LOW);
   oneLiner(2, F("heat test complete"));
   delay(2000);
 }
 
 void humidifierTest(){
   oneLiner(2, F("humidifier test starting"));
-  delay(2000);
-  digitalWrite(HUMID, HIGH);
-  delay(100);
-  digitalWrite(HUMID, LOW);
+  digitalWrite(HUMID_P, HIGH);
   delay(10000);
-  digitalWrite(HUMID, HIGH);
-  delay(100);
-  digitalWrite(HUMID, LOW);
+  digitalWrite(HUMID_P, LOW);
   oneLiner(2, F("humidifier test complete"));
   delay(2000);
 }
@@ -186,11 +183,11 @@ void loop() {
   Serial.println(F("starting unit tests"));
   
   if (displayTest()){
-//    rotaryTest(); 
-//    sensorTest();
+    rotaryTest(); 
+    sensorTest();
      fanTest();
-    // humidifierTest();
-    // heatTest();
+     humidifierTest();
+     heatTest();
     oneLiner(4, "done!");
   }
   
