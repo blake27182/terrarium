@@ -19,6 +19,7 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // temp/humid sensor
+// BMP280 i2c address: 0x77 AHT20 i2c address: 0x38
 Adafruit_AHTX0 aht;
 const char tComplete[] PROGMEM = " test complete";
 const char tStarting[] PROGMEM = " test starting";
@@ -183,12 +184,12 @@ void loop() {
   Serial.println(F("starting unit tests"));
   
   if (displayTest()){
-    rotaryTest(); 
+//    rotaryTest(); 
     sensorTest();
-     fanTest();
-     humidifierTest();
-     heatTest();
-    oneLiner(4, "done!");
+//     fanTest();
+//     humidifierTest();
+//     heatTest();
+//    oneLiner(4, "done!");
   }
   
   

@@ -9,13 +9,14 @@
 #define ROT_A  2
 #define ROT_B  3
 #define ROT_C  5
-#define FAN_A 6
-#define FAN_B 8
+#define FAN_A 8
+#define FAN_B 6
 #define HUMID 10
 #define HEAT 4
 #define TEMP_FACTOR .1
 #define HUMID_FACTOR .25
 #define FRESH_FACTOR .25
+#define MIST_FACTOR .25
 #define TEMP_OFFSET 0
 #define HUMID_OFFSET 0
 #define ULONG_MAX 0xffffffff
@@ -24,22 +25,25 @@
 // declare global vars ////////////////
 Adafruit_AHTX0 aht;
 sensors_event_t humidity, temp;
-byte carousel;
+byte carousel = 0;
 bool fahrenheit = false;
 float tempL = 0;
 float tempH = 0;
 float humidL = 0;
 float humidH = 0;
-float freshP = 0;
+float freshAir = 24;
+float mist = 24;
 uint8_t bitCursor = 0;
 int8_t table[] = {0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0};
 bool rotaryTurned = false;
 bool heatState = false; 
 bool humidState = false;
+bool mistState = false;
 bool fanAState = false;
 bool fanBState = false;
 unsigned long fanATrigger = 3600000;        // 1 hr
 unsigned long fanBTrigger = 36000000;       // 10 hr
+unsigned long mistTrigger = ULONG_MAX;       // infinity
 unsigned long fanBOffPeriod = 36000000;     // 10 hr
 unsigned long fanBOnPeriod = 300000;        // 5 min
 unsigned long lastInteract = millis();
@@ -52,6 +56,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 void setup() {
   Serial.begin(9600);
+
+  Serial.println(F("beginning"));
 
   // rotary encoder ////////////////
   pinMode(ROT_A, INPUT);
@@ -78,13 +84,23 @@ void setup() {
   display.display();
   display.clearDisplay();
   display.display(); 
+
   
+  Serial.println(F("sensor beginning"));
   // setup temp/humidity sensor ////////////////
   if (! aht.begin()) {
     Serial.println("Could not find AHT? Check wiring");
-    while (1) delay(10);
   }
+  Serial.println(F("sensor done"));
   aht.getEvent(&humidity, &temp);
+
+  // finished setup 
+  display.clearDisplay();
+  for(int16_t i=0; i<max(display.width(),display.height())/2; i+=2) {
+    display.drawCircle(display.width()/2, display.height()/2, i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
 }
 
 // printing helper
@@ -108,9 +124,9 @@ void heatPower(bool power){
   if (power != heatState){
     digitalWrite(HEAT, power);
     heatState = power;
-    if (!power && !humidState){
+    if (!power && !humidState && !mistState){
       fanATrigger = millis() + 30000;
-    } else {
+    } else if (power){
       fanATrigger = ULONG_MAX;
       fanAPower(true);
     }
@@ -121,9 +137,22 @@ void humidPower(bool power){
   if (humidState != power){
     digitalWrite(HUMID, power);
     humidState = power;
-    if (!power && !heatState){
+    if (!power && !heatState && !mistState){
       fanATrigger = millis() + 30000;
-    } else {
+    } else if (power){
+      fanATrigger = ULONG_MAX;
+      fanAPower(true);
+    }
+  }
+}
+
+void mistPower(bool power){
+  if (mistState != power){
+    digitalWrite(HUMID, power);
+    mistState = power;
+    if (!power && !heatState && !mistState){
+      fanATrigger = millis() + 30000;
+    } else if (power){
       fanATrigger = ULONG_MAX;
       fanAPower(true);
     }
@@ -180,6 +209,7 @@ void homeScreen(){
 
 
 
+
   // timers ////////////////
   if (millis() > fanATrigger){
     if (fanAState){
@@ -192,18 +222,29 @@ void homeScreen(){
 
   if (millis() > fanBTrigger){
   	if (fanBState){
-	  	fanBTrigger = millis() + fanBOffPeriod;	    // off 10 hrs
+	  	fanBTrigger = millis() + freshAir * 3600000;	    // off x hrs
   	} else {
   		fanBTrigger = millis() + fanBOnPeriod; 			// on 5 min
   	}
     fanBPower(!fanBState);
   }
+
+  if (millis() > mistTrigger){
+    if (mistState){
+      mistTrigger = millis() + mist * 3600000;     // off x hrs
+    } else {
+      mistTrigger = millis() + 20000;      // on 20 seconds
+    }
+    mistPower(!mistState);
+  }
+
   
   // printing center ////////////////
+  
   display.clearDisplay();
   display.setTextSize(4);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 5);
+  display.setCursor(0, 0);
 
   dtostrf(currTemp, 4, 1, buff);
   Serial.println(buff);
@@ -219,6 +260,7 @@ void homeScreen(){
   }
 
   display.print(currHumid);
+  Serial.println(currHumid);
   if (humidState){
     if (currHumid == 100){
       display.print(" ");
@@ -250,6 +292,8 @@ void tempLowScreen(){
   printFormatter();
   display.print(buff);
   display.println("C");
+  display.setTextSize(3);
+  display.println(F("tempL"));
 }
 
 void tempHighScreen(){
@@ -268,12 +312,17 @@ void tempHighScreen(){
   printFormatter();
   display.print(buff);
   display.println("C");
+  display.setTextSize(3);
+  display.println(F("tempH"));
 }
 
 void humidLowScreen(){
   display.clearDisplay();
-  display.setTextSize(4);
+  display.setTextSize(3);
   display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println(F("humidL"));
+  display.setTextSize(4);
   display.setCursor(0, 32);
   
   if (humidL < 0){
@@ -293,8 +342,11 @@ void humidLowScreen(){
 
 void humidHighScreen(){
   display.clearDisplay();
-  display.setTextSize(4);
+  display.setTextSize(3);
   display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println(F("humidH"));
+  display.setTextSize(4);
   display.setCursor(0, 32);
 
   if (humidH > 95){
@@ -314,23 +366,63 @@ void humidHighScreen(){
 
 void freshAirScreen(){
   display.clearDisplay();
-  display.setTextSize(4);
+  display.setTextSize(2);
   display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println(F("fresh air"));
+  display.setTextSize(4);
   display.setCursor(0, 32);
 
-  if (freshP > 24){
+  if (freshAir > 24){
     counter = 24 / FRESH_FACTOR;
   } 
-  if (freshP < 1){
+  if (freshAir < 1){
     counter = 1 / FRESH_FACTOR;
   }
 
-  freshP = counter * FRESH_FACTOR;
+  freshAir = counter * FRESH_FACTOR;
 
-  dtostrf((int)freshP, 0, 0, buff);
-  printFormatter();
-  display.print(buff);
-  display.println("hr");
+  if (freshAir < 24){
+    fanBTrigger = freshAir * 3600000;
+    dtostrf((int)freshAir, 0, 0, buff);
+    printFormatter();
+    display.print(buff);
+    display.println("hr");
+  } else {
+    fanBTrigger = ULONG_MAX;
+    display.println("off");
+  }
+}
+
+void mistScreen(){
+  display.clearDisplay();
+  display.setTextSize(3);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println(F("mist"));
+  display.setTextSize(4);
+  display.setCursor(0, 32);
+
+  if (mist > 24){
+    counter = 24 / MIST_FACTOR;
+  } 
+  if (mist < 1){
+    counter = 1 / MIST_FACTOR;
+  }
+  
+
+  mist = counter * FRESH_FACTOR;
+
+  if (mist < 24){
+    mistTrigger = mist * 3600000;
+    dtostrf((int)mist, 0, 0, buff);
+    printFormatter();
+    display.print(buff);
+    display.println("hr");
+  } else {
+    mistTrigger = ULONG_MAX;
+    display.println("off");
+  }
 }
 
 void pauseScreen(){
@@ -338,6 +430,12 @@ void pauseScreen(){
   display.setTextSize(4);
   display.setTextColor(WHITE);
   display.setCursor(0, 32);
+
+  humidPower(false);
+  heatPower(false);
+  fanAPower(false);
+  fanBPower(false);
+  mistPower(false);
 
   display.println("Paused");
 }
@@ -364,36 +462,41 @@ void loop() {
       }
       delay(25);
       break;
-    case 1:		// maximum temperature
-      carouselCase(&tempHighScreen);
+    case 1:
+      tempHighScreen();
       break;
-    case 2:		// minimum temperature
-      carouselCase(&tempLowScreen);
+    case 2:
+      tempLowScreen();
       break;
-    case 3:		// maximum humidity
-      carouselCase(&humidHighScreen);
+    case 3:
+      humidHighScreen();
       break;
-    case 4:		// minimum humidity
-      carouselCase(&humidLowScreen);
+    case 4:
+      humidLowScreen();
       break;
-    case 5:		// maximum humidity
-      carouselCase(&freshAirScreen);
+    case 5:
+      freshAirScreen();
       break;
-    // case -1:
-    //   pauseScreen();
-    //   break;
+    case 6:
+      mistScreen();
+      break;
+    case -1:
+      pauseScreen();
+      break;
   }
+  display.display();
 
   // button check ////////////////
   if (!digitalRead(ROT_C)){
-    carousel = (carousel + 1) % 5;
+    carousel = (carousel + 1) % 7;
     lastInteract = millis();
     clearBuffer();
+    Serial.println(F("button"));
     
     while (!digitalRead(ROT_C)){
-      // if (millis() > lastInteract + 3000){
-      //   carousel = -1;
-      // }
+       if (millis() > lastInteract + 3000){
+         carousel = -1;
+       }
       delay(10);
     }
 
@@ -419,8 +522,12 @@ void loop() {
         humidLowScreen();
         break;
       case 5:
-        counter = fanBOffPeriod/FRESH_FACTOR;
+        counter = freshAir/FRESH_FACTOR;
         freshAirScreen();
+        break;
+      case 6:
+        counter = mist/MIST_FACTOR;
+        mistScreen();
         break;
     }
     display.display();
