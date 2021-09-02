@@ -6,13 +6,13 @@
 // constants
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
-#define ROT_A  2
-#define ROT_B  3
-#define ROT_C  5
-#define FAN_A 6
+#define ROT_A 2
+#define ROT_B 3
+#define ROT_C 4
+#define FAN_A 11
 #define FAN_B 8
-#define HUMID 10
-#define HEAT 4
+#define HUMID 6
+#define HEAT 5
 #define TEMP_FACTOR .1
 #define HUMID_FACTOR .25
 #define FRESH_FACTOR .25
@@ -24,7 +24,7 @@
 // declare global vars ////////////////
 Adafruit_AHTX0 aht;
 sensors_event_t humidity, temp;
-byte carousel;
+byte carousel = 1;
 bool fahrenheit = false;
 float tempL = 0;
 float tempH = 0;
@@ -39,7 +39,7 @@ bool humidState = false;
 bool fanAState = false;
 bool fanBState = false;
 unsigned long fanATrigger = 3600000;        // 1 hr
-unsigned long fanBTrigger = 36000000;       // 10 hr
+unsigned long fanBTrigger = 3600000;        // 1 hr
 unsigned long fanBOffPeriod = 36000000;     // 10 hr
 unsigned long fanBOnPeriod = 300000;        // 5 min
 unsigned long lastInteract = millis();
@@ -85,6 +85,14 @@ void setup() {
     while (1) delay(10);
   }
   aht.getEvent(&humidity, &temp);
+  
+  // finished setup 
+  display.clearDisplay();
+  for(int16_t i=0; i<max(display.width(),display.height())/2; i+=2) {
+    display.drawCircle(display.width()/2, display.height()/2, i, SSD1306_WHITE);
+    display.display();
+    delay(1);
+  }
 }
 
 // printing helper
@@ -155,13 +163,13 @@ void rotaryRead(){
 }
 
 void homeScreen(){
-	// get current reading from sensor
+  // get current reading from sensor
   aht.getEvent(&humidity, &temp);
   float currTemp;
   if (fahrenheit){
-  	currTemp = ((temp.temperature + TEMP_OFFSET) * 9/5) + 32;
+    currTemp = ((temp.temperature + TEMP_OFFSET) * 9/5) + 32;
   } else {
-	currTemp = temp.temperature + TEMP_OFFSET;
+  currTemp = temp.temperature + TEMP_OFFSET;
   }
   int currHumid = humidity.relative_humidity + HUMID_OFFSET;
 
@@ -191,11 +199,11 @@ void homeScreen(){
   }
 
   if (millis() > fanBTrigger){
-  	if (fanBState){
-	  	fanBTrigger = millis() + fanBOffPeriod;	    // off 10 hrs
-  	} else {
-  		fanBTrigger = millis() + fanBOnPeriod; 			// on 5 min
-  	}
+    if (fanBState){
+      fanBTrigger = millis() + freshP * 3600000;      // off x hrs
+    } else {
+      fanBTrigger = millis() + fanBOnPeriod;      // on 5 min
+    }
     fanBPower(!fanBState);
   }
   
@@ -250,6 +258,8 @@ void tempLowScreen(){
   printFormatter();
   display.print(buff);
   display.println("C");
+  display.setTextSize(3);
+  display.println(F("tempL"));
 }
 
 void tempHighScreen(){
@@ -268,12 +278,17 @@ void tempHighScreen(){
   printFormatter();
   display.print(buff);
   display.println("C");
+  display.setTextSize(3);
+  display.println(F("tempH"));
 }
 
 void humidLowScreen(){
   display.clearDisplay();
-  display.setTextSize(4);
+  display.setTextSize(3);
   display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println(F("humidL"));
+  display.setTextSize(4);
   display.setCursor(0, 32);
   
   if (humidL < 0){
@@ -293,8 +308,11 @@ void humidLowScreen(){
 
 void humidHighScreen(){
   display.clearDisplay();
-  display.setTextSize(4);
+  display.setTextSize(3);
   display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println(F("humidH"));
+  display.setTextSize(4);
   display.setCursor(0, 32);
 
   if (humidH > 95){
@@ -314,8 +332,11 @@ void humidHighScreen(){
 
 void freshAirScreen(){
   display.clearDisplay();
-  display.setTextSize(4);
+  display.setTextSize(2);
   display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println(F("fresh air"));
+  display.setTextSize(4);
   display.setCursor(0, 32);
 
   if (freshP > 24){
@@ -335,11 +356,12 @@ void freshAirScreen(){
 
 void pauseScreen(){
   display.clearDisplay();
-  display.setTextSize(4);
+  display.setTextSize(3);
   display.setTextColor(WHITE);
   display.setCursor(0, 32);
 
   display.println("Paused");
+  display.display();
 }
 
 void carouselCase(const void *screen()){
@@ -349,14 +371,17 @@ void carouselCase(const void *screen()){
     screen();
     display.display();
   } else if (millis() - lastInteract > 30000){
-    carousel = 0;
+    carousel = 1;
   }
 }
 
 void loop() {
   // page switch statement ////////////////
   switch (carousel){
-    case 0:		// home
+    case 0:
+      pauseScreen();
+      break;
+    case 1:   // home
       if (millis() - lastInteract > 500){
         lastInteract = millis();
         homeScreen();
@@ -364,19 +389,19 @@ void loop() {
       }
       delay(25);
       break;
-    case 1:		// maximum temperature
+    case 2:   // maximum temperature
       carouselCase(&tempHighScreen);
       break;
-    case 2:		// minimum temperature
+    case 3:   // minimum temperature
       carouselCase(&tempLowScreen);
       break;
-    case 3:		// maximum humidity
+    case 4:   // maximum humidity
       carouselCase(&humidHighScreen);
       break;
-    case 4:		// minimum humidity
+    case 5:   // minimum humidity
       carouselCase(&humidLowScreen);
       break;
-    case 5:		// maximum humidity
+    case 6:   // maximum humidity
       carouselCase(&freshAirScreen);
       break;
     // case -1:
@@ -386,40 +411,48 @@ void loop() {
 
   // button check ////////////////
   if (!digitalRead(ROT_C)){
-    carousel = (carousel + 1) % 5;
+    carousel = (carousel % 6) + 1;
     lastInteract = millis();
     clearBuffer();
     
     while (!digitalRead(ROT_C)){
-      // if (millis() > lastInteract + 3000){
-      //   carousel = -1;
-      // }
+       if (millis() > lastInteract + 3000){
+         Serial.println(F("pause threshold reached"));
+         carousel = 0;
+          humidPower(false);
+          heatPower(false);
+          fanAPower(false);
+          fanBPower(false);
+         pauseScreen();
+       }
       delay(10);
     }
 
     // page initialization
     switch (carousel){
       case 0:
-        homeScreen();
         break;
       case 1:
+        homeScreen();
+        break;
+      case 2:
         counter = tempH/TEMP_FACTOR;
         tempHighScreen();
         break;
-      case 2:
+      case 3:
         counter = tempL/TEMP_FACTOR;
         tempLowScreen();
         break;
-      case 3:
+      case 4:
         counter = humidH/HUMID_FACTOR;
         humidHighScreen();
         break;
-      case 4:
+      case 5:
         counter = humidL/HUMID_FACTOR;
         humidLowScreen();
         break;
-      case 5:
-        counter = fanBOffPeriod/FRESH_FACTOR;
+      case 6:
+        counter = freshP/FRESH_FACTOR;
         freshAirScreen();
         break;
     }

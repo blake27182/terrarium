@@ -11,7 +11,11 @@
 #define ROT_C  5
 #define FAN_A 8
 #define FAN_B 10
+<<<<<<< HEAD
 #define HUMID_P 12
+=======
+#define HUMID 12
+>>>>>>> beta-release
 #define HEAT 6
 
 
@@ -19,6 +23,7 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // temp/humid sensor
+// BMP280 i2c address: 0x77 AHT20 i2c address: 0x38
 Adafruit_AHTX0 aht;
 const char tComplete[] PROGMEM = " test complete";
 const char tStarting[] PROGMEM = " test starting";
@@ -36,13 +41,21 @@ void setup() {
   pinMode(ROT_C, INPUT);
   pinMode(FAN_A, OUTPUT);
   pinMode(FAN_B, OUTPUT);
+<<<<<<< HEAD
   pinMode(HUMID_P, OUTPUT);
+=======
+  pinMode(HUMID, OUTPUT);
+>>>>>>> beta-release
   pinMode(HEAT, OUTPUT);
 
   digitalWrite(HEAT, LOW);
   digitalWrite(FAN_A, LOW);
   digitalWrite(FAN_B, LOW);
+<<<<<<< HEAD
   digitalWrite(HUMID_P, LOW);
+=======
+  digitalWrite(HUMID, LOW);
+>>>>>>> beta-release
 }
 
 void fanTest(){
@@ -161,9 +174,15 @@ void heatTest(){
 
 void humidifierTest(){
   oneLiner(2, F("humidifier test starting"));
+<<<<<<< HEAD
   digitalWrite(HUMID_P, HIGH);
   delay(10000);
   digitalWrite(HUMID_P, LOW);
+=======
+  digitalWrite(HUMID, HIGH);
+  delay(10000);
+  digitalWrite(HUMID, LOW);
+>>>>>>> beta-release
   oneLiner(2, F("humidifier test complete"));
   delay(2000);
 }
@@ -183,12 +202,21 @@ void loop() {
   Serial.println(F("starting unit tests"));
   
   if (displayTest()){
+<<<<<<< HEAD
     rotaryTest(); 
     sensorTest();
      fanTest();
      humidifierTest();
      heatTest();
     oneLiner(4, "done!");
+=======
+//    rotaryTest(); 
+//    sensorTest();
+//     fanTest();
+//     humidifierTest();
+     heatTest();
+//    oneLiner(4, "done!");
+>>>>>>> beta-release
   }
   
   
